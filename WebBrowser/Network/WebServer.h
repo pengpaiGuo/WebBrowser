@@ -7,8 +7,8 @@
 //
 
 #import <Foundation/Foundation.h>
-#import <GCDWebServers/GCDWebServers.h>
-
+#import <GCDWebServer/GCDWebServer.h>
+#import <GCDWebServer/GCDWebServerDataResponse.h>
 typedef GCDWebServerResponse *(^ServerBlock)(GCDWebServerRequest *);
 
 @interface WebServer : NSObject
