@@ -32,7 +32,7 @@ static NSMutableArray *redirecting = nil;
         
         NSUInteger index = [[self redirecting] indexOfObject:originalURL];
         if (index == NSNotFound) {
-            return [GCDWebServerDataResponse responseWithRedirect:originalURL permanent:NO];
+            return [GCDWebServerResponse responseWithRedirect:originalURL permanent:NO];
         }
         
         [[self redirecting] removeObjectAtIndex:index];

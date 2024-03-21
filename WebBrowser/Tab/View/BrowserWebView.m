@@ -16,6 +16,7 @@
 
 #import <objc/runtime.h>
 #import <objc/message.h>
+#import <WebKit/WKWebViewConfiguration.h>
 
 @interface BrowserWebView () <MenuHelperInterface>
 
@@ -26,6 +27,22 @@
 @end
 
 @implementation BrowserWebView
+
++ (instancetype)webView {
+    WKWebViewConfiguration * config = [[WKWebViewConfiguration alloc]init];
+    config.allowsInlineMediaPlayback = YES;
+    config.allowsPictureInPictureMediaPlayback = YES;
+    config.mediaTypesRequiringUserActionForPlayback = WKAudiovisualMediaTypeAll;
+    BrowserWebView * newWebView = [[BrowserWebView alloc]initWithFrame:CGRectMake(0, 0, 0, 0) configuration:config];
+    return newWebView;
+}
+
+-(instancetype)initWithFrame:(CGRect)frame configuration:(WKWebViewConfiguration *)configuration {
+    if (self = [super initWithFrame:frame configuration:configuration]) {
+        [self initializeWebView];
+    }
+    return self;
+}
 
 - (instancetype)initWithFrame:(CGRect)frame{
     if (self = [super initWithFrame:frame]) {
@@ -40,10 +57,7 @@
     self.backgroundColor = [UIColor whiteColor];
     
     self.opaque = NO;
-    self.delegate = self;
-    self.allowsInlineMediaPlayback = YES;
-    self.mediaPlaybackRequiresUserAction = NO;
-    self.scalesPageToFit = YES;
+    self.navigationDelegate = self;
     if (@available(iOS 11.0, *)) {
         self.scrollView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
     }
@@ -63,6 +77,8 @@
     longPressGesture.delegate = [TabManager sharedInstance].browserContainerView;
     [self addGestureRecognizer:longPressGesture];
     [longPressGesture release];
+    [self addObserver:self forKeyPath:@"title" options:NSKeyValueObservingOptionNew context:NULL];
+
 }
 
 - (void)setBounds:(CGRect)bounds{
@@ -72,7 +88,7 @@
     [super setBounds:bounds];
 }
 
-- (void)evaluateJavaScript:(NSString *)javaScriptString completionHandler:(WebCompletionBlock)completionHandler
+- (void)browserEvaluateJavaScript:(NSString *)javaScriptString completionHandler:(WebCompletionBlock)completionHandler
 {
     if (!javaScriptString || [javaScriptString length] == 0) {
         return;
@@ -80,16 +96,14 @@
     
     NSString *cpJSString = [javaScriptString copy];
     __block WebCompletionBlock block = [completionHandler copy];
-    
     dispatch_async(dispatch_get_main_queue(), ^{
-        NSString* result = [self stringByEvaluatingJavaScriptFromString:cpJSString];
-        [cpJSString release];
-        
-        if (block) {
-            block(result,nil);
-            [block release];
-            block = nil;
-        }
+        [self evaluateJavaScript:cpJSString completionHandler:^(NSString * result, NSError * error) {
+            if (block) {
+                block(result,nil);
+                [block release];
+                block = nil;
+            }
+        }];
     });
 }
 
@@ -101,36 +115,38 @@
 }
 
 - (NSString *)mainFURL{
-    NSAssert([NSThread isMainThread], @"method should called in main thread");
-    
-    id webView = [self webView];
-    
-    if(webView)
-    {
-        if([webView respondsToSelector:NSSelectorFromString(MAIN_FRAME_URL)])
-            return [[(MAIN_FRAME_URL__PROTO objc_msgSend)(webView, NSSelectorFromString(MAIN_FRAME_URL)) retain] autorelease];
-        else
-            return nil;
-    }
-    else
-        return nil;
+    return self.URL.absoluteString;
+//    NSAssert([NSThread isMainThread], @"method should called in main thread");
+//    
+//    id webView = [self webView];
+//    
+//    if(webView)
+//    {
+//        if([webView respondsToSelector:NSSelectorFromString(MAIN_FRAME_URL)])
+//            return [[(MAIN_FRAME_URL__PROTO objc_msgSend)(webView, NSSelectorFromString(MAIN_FRAME_URL)) retain] autorelease];
+//        else
+//            return nil;
+//    }
+//    else
+//        return nil;
 }
 
 - (NSString *)mainFTitle
 {
-    NSAssert([NSThread isMainThread], @"method should called in main thread");
-    
-    id webView = [self webView];
-    
-    if(webView)
-    {
-        if([webView respondsToSelector:NSSelectorFromString(MAIN_FRAME_TITLE)])
-            return [[(MAIN_FRAME_TITLE__PROTO objc_msgSend)(webView, NSSelectorFromString(MAIN_FRAME_TITLE)) retain] autorelease];
-        else
-            return nil;
-    }
-    else
-        return nil;
+    return self.title;
+//    NSAssert([NSThread isMainThread], @"method should called in main thread");
+//    
+//    id webView = [self webView];
+//    
+//    if(webView)
+//    {
+//        if([webView respondsToSelector:NSSelectorFromString(MAIN_FRAME_TITLE)])
+//            return [[(MAIN_FRAME_TITLE__PROTO objc_msgSend)(webView, NSSelectorFromString(MAIN_FRAME_TITLE)) retain] autorelease];
+//        else
+//            return nil;
+//    }
+//    else
+//        return nil;
 }
 
 - (void)webViewBackForwardListWithCompletion:(BackForwardListCompletion)completion{
@@ -245,25 +261,61 @@
     return webView;
 }
 
-#pragma mark - UIWebViewDelegate
+#pragma mark - WKNavigationDelegate
+// 页面开始加载时调用
 
-- (void)webViewDidStartLoad:(BrowserWebView *)webView{
-    [[DelegateManager sharedInstance] performSelector:@selector(webViewDidStartLoad:) arguments:@[webView] key:kDelegateManagerWebView];
+-(void)webView:(WKWebView *)webView didStartProvisionalNavigation:(WKNavigation *)navigation {
+    [[DelegateManager sharedInstance] performSelector:@selector(browserWebViewDidStartLoad:) arguments:@[webView] key:kDelegateManagerWebView];
 }
-
-- (void)webView:(BrowserWebView *)webView didFailLoadWithError:(NSError *)error{
-    [[DelegateManager sharedInstance] performSelector:@selector(webView:didFailLoadWithError:) arguments:@[webView,error] key:kDelegateManagerWebView];
+//提交发生错误时调用
+- (void)webView:(WKWebView *)webView didFailNavigation:(WKNavigation *)navigation withError:(NSError *)error {
+    [[DelegateManager sharedInstance] performSelector:@selector(browserWebView:didFailLoadWithError:) arguments:@[webView,error] key:kDelegateManagerWebView];
     [self.indicatorView stopAnimating];
 }
-
-- (BOOL)webView:(BrowserWebView *)webView shouldStartLoadWithRequest:(NSURLRequest *)request navigationType:(UIWebViewNavigationType)navigationType{
+// 页面加载失败时调用
+-(void)webView:(WKWebView *)webView didFailProvisionalNavigation:(WKNavigation *)navigation withError:(NSError *)error {
+    [[DelegateManager sharedInstance] performSelector:@selector(browserWebView:didFailLoadWithError:) arguments:@[webView,error] key:kDelegateManagerWebView];
+    [self.indicatorView stopAnimating];
+}
+// 当内容开始返回时调用
+-(void)webView:(WKWebView *)webView didCommitNavigation:(WKNavigation *)navigation {
+    [self browserWebViewForMainFrameDidCommitLoad:webView];
+}
+// 页面加载完成之后调用
+-(void)webView:(WKWebView *)webView didFinishNavigation:(WKNavigation *)navigation {
+    [[DelegateManager sharedInstance] performSelector:@selector(browserWebViewDidFinishLoad:) arguments:@[webView] key:kDelegateManagerWebView];
+    [self browserWebViewForMainFrameDidFinishLoad:webView];
+    [self.indicatorView stopAnimating];
+}
+// 接收到服务器跳转请求即服务重定向时之后调用
+-(void)webView:(WKWebView *)webView decidePolicyForNavigationAction:(nonnull WKNavigationAction *)navigationAction decisionHandler:(nonnull void (^)(WKNavigationActionPolicy))decisionHandler {
     BOOL isShouldStart = YES;
     
     NSArray<WeakWebBrowserDelegate *> *delegates = [[DelegateManager sharedInstance] webViewDelegates];
     
     foreach(delegate, delegates) {
-        if ([delegate.delegate respondsToSelector:@selector(webView:shouldStartLoadWithRequest:navigationType:)]) {
-            isShouldStart = [delegate.delegate webView:webView shouldStartLoadWithRequest:request navigationType:navigationType];
+        if ([delegate.delegate respondsToSelector:@selector(browserWebView:shouldStartLoadWithRequest:navigationType:)]) {
+            isShouldStart = [delegate.delegate browserWebView:webView shouldStartLoadWithRequest:navigationAction.request navigationType:nil];
+            if (!isShouldStart) {
+                break;;
+            }
+        }
+    }
+    if (isShouldStart){
+        decisionHandler(WKNavigationActionPolicyAllow);
+    }else {
+        decisionHandler(WKNavigationActionPolicyCancel);
+    }
+}
+
+- (BOOL)browserWebView:(BrowserWebView *)webView shouldStartLoadWithRequest:(NSURLRequest *)request navigationType:(UIWebViewNavigationType)navigationType{
+    BOOL isShouldStart = YES;
+    
+    NSArray<WeakWebBrowserDelegate *> *delegates = [[DelegateManager sharedInstance] webViewDelegates];
+    
+    foreach(delegate, delegates) {
+        if ([delegate.delegate respondsToSelector:@selector(browserWebView:shouldStartLoadWithRequest:navigationType:)]) {
+            isShouldStart = [delegate.delegate browserWebView:webView shouldStartLoadWithRequest:request navigationType:navigationType];
             if (!isShouldStart) {
                 return isShouldStart;
             }
@@ -272,11 +324,16 @@
     
     return isShouldStart;
 }
-
-- (void)webViewDidFinishLoad:(BrowserWebView *)webView{
-    [[DelegateManager sharedInstance] performSelector:@selector(webViewDidFinishLoad:) arguments:@[webView] key:kDelegateManagerWebView];
-    
-    [self.indicatorView stopAnimating];
+ 
+#pragma mark - KVO 实现方法
+- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary<NSKeyValueChangeKey,id> *)change context:(void *)context {
+    if ([keyPath isEqualToString:@"title"]) {
+        if (object == self) {
+            [self browserWebView:self gotTitleName:self.title];
+        } else {
+            [super observeValueForKeyPath:keyPath ofObject:object change:change context:context];
+        }
+    }
 }
 
 #pragma mark - private method
@@ -294,7 +351,7 @@
     
     if(mainFrame == frame)
     {
-        [self webView:self gotTitleName:title];
+        [self browserWebView:self gotTitleName:title];
     }
     
     [self.indicatorView stopAnimating];
@@ -304,7 +361,7 @@
     if ([challenge class] == [NSURLAuthenticationChallenge class] ) {
         NSURLAuthenticationChallenge *urlChallenge = (NSURLAuthenticationChallenge *)challenge;
         
-        [[DelegateManager sharedInstance] performSelector:@selector(webView:didReceiveAuthenticationChallenge:) arguments:@[self, urlChallenge] key:kDelegateManagerWebView];
+        [[DelegateManager sharedInstance] performSelector:@selector(browserWebView:didReceiveAuthenticationChallenge:) arguments:@[self, urlChallenge] key:kDelegateManagerWebView];
     }
     else {
         if([self respondsToSelector:@selector(zwWebView:resource:didReceiveAuthenticationChallenge:fromDataSource:)])
@@ -347,7 +404,7 @@
 }
 
 #pragma mark - main frame load functions
-//webViewMainFrameDidCommitLoad:
+
 - (void)zwMainFrameCommitLoad:(id)arg1
 {
     if([self respondsToSelector:@selector(zwMainFrameCommitLoad:)])
@@ -355,17 +412,16 @@
         ((void(*)(id, SEL, id)) objc_msgSend)(self, @selector(zwMainFrameCommitLoad:),arg1);
     }
     
-    [self webViewForMainFrameDidCommitLoad:self];
+    [self browserWebViewForMainFrameDidCommitLoad:self];
 }
 
-- (void)webViewForMainFrameDidCommitLoad:(BrowserWebView *)webView{
+- (void)browserWebViewForMainFrameDidCommitLoad:(BrowserWebView *)webView{
     self.webModel.url = [self mainFURL];
     self.isMainFrameLoaded = NO;
     
-    [[DelegateManager sharedInstance] performSelector:@selector(webViewForMainFrameDidCommitLoad:) arguments:@[self] key:kDelegateManagerWebView];
+    [[DelegateManager sharedInstance] performSelector:@selector(browserWebViewForMainFrameDidCommitLoad:) arguments:@[self] key:kDelegateManagerWebView];
 }
 
-//webViewMainFrameDidFinishLoad:
 - (void)zwMainFrameFinishLoad:(id)arg1
 {
     if([self respondsToSelector:@selector(zwMainFrameFinishLoad:)])
@@ -373,20 +429,20 @@
         ((void(*)(id, SEL, id)) objc_msgSend)(self, @selector(zwMainFrameFinishLoad:),arg1);
     }
     
-    [self webViewForMainFrameDidFinishLoad:self];
+    [self browserWebViewForMainFrameDidFinishLoad:self];
 }
 
-- (void)webViewForMainFrameDidFinishLoad:(BrowserWebView *)webView{
+- (void)browserWebViewForMainFrameDidFinishLoad:(BrowserWebView *)webView{
     self.isMainFrameLoaded = YES;
     
-    [[DelegateManager sharedInstance] performSelector:@selector(webViewForMainFrameDidFinishLoad:) arguments:@[self] key:kDelegateManagerWebView];
+    [[DelegateManager sharedInstance] performSelector:@selector(browserWebViewForMainFrameDidFinishLoad:) arguments:@[self] key:kDelegateManagerWebView];
 }
 
 #pragma mark - replaced method calling
 
-- (void)webView:(BrowserWebView *)webView gotTitleName:(NSString*)titleName{
+- (void)browserWebView:(BrowserWebView *)webView gotTitleName:(NSString*)titleName{
     self.webModel.title = titleName;
-    [[DelegateManager sharedInstance] performSelector:@selector(webView:gotTitleName:) arguments:@[webView,titleName] key:kDelegateManagerWebView];
+    [[DelegateManager sharedInstance] performSelector:@selector(browserWebView:gotTitleName:) arguments:@[webView,titleName] key:kDelegateManagerWebView];
 }
 
 #pragma mark - frame method
@@ -425,11 +481,10 @@
     _webModel = nil;
 	[_homePage release];
     _homePage = nil;
-    self.delegate = nil;
-    self.scrollView.delegate = nil;
+    self.navigationDelegate = nil;
     [self stopLoading];
     [self loadHTMLString:@"" baseURL:nil];
-    
+    [self removeObserver:self forKeyPath:@"title"];
     DDLogDebug(@"BrowserWebView dealloc");
 
     [super dealloc];

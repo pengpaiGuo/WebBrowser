@@ -28,6 +28,7 @@
 
 static NSString *const kBrowserViewControllerAddBookmarkSuccess = @"添加书签成功";
 static NSString *const kBrowserViewControllerAddBookmarkFailure = @"添加书签失败";
+static NSString *const kBrowserViewControllerGetVideoUrlFailure = @"提取失败";
 
 @interface BrowserViewController () <BrowserBottomToolBarButtonClickedDelegate, UIViewControllerRestoration, KeyboardHelperDelegate>
 
@@ -53,7 +54,7 @@ SYNTHESIZE_SINGLETON_FOR_CLASS(BrowserViewController)
     [self initializeView];
     
     [self initializeNotification];
-
+    
     self.lastContentOffset = - TOP_TOOL_BAR_HEIGHT;
     
     [[DelegateManager sharedInstance] registerDelegate:self forKeys:@[kDelegateManagerWebView, kDelegateManagerFindInPageBarDelegate]];
@@ -74,7 +75,7 @@ SYNTHESIZE_SINGLETON_FOR_CLASS(BrowserViewController)
         [self.view addSubview:browserContainerView];
         
         self.browserButtonDelegate = browserContainerView;
-
+        
         browserContainerView;
     });
     
@@ -102,7 +103,7 @@ SYNTHESIZE_SINGLETON_FOR_CLASS(BrowserViewController)
         toolBar.browserButtonDelegate = self;
         
         [self.browserContainerView addObserver:toolBar forKeyPath:@"webView" options:NSKeyValueObservingOptionNew|NSKeyValueObservingOptionInitial context:NULL];
-    
+        
         toolBar;
     });
 }
@@ -170,7 +171,7 @@ SYNTHESIZE_SINGLETON_FOR_CLASS(BrowserViewController)
         if (self.browserTopToolBar.height - offset <= TOP_TOOL_BAR_THRESHOLD) {
             self.browserTopToolBar.height = TOP_TOOL_BAR_THRESHOLD;
             self.browserContainerView.scrollView.contentInset = UIEdgeInsetsMake(TOP_TOOL_BAR_THRESHOLD, 0, 0, 0);
-
+            
             bottomRect.origin.y = self.view.height;
         }
         else
@@ -216,25 +217,34 @@ SYNTHESIZE_SINGLETON_FOR_CLASS(BrowserViewController)
         WEAK_REF(self)
         NSArray<SettingsMenuItem *> *items =
         @[
-          [SettingsMenuItem itemWithText:@"扩展" image:[UIImage imageNamed:@"album"] action:^{
-              [self_ pushTableViewControllerWithControllerName:[ExtentionsTableViewController class] style:UITableViewStyleGrouped];
-          }],
-          [SettingsMenuItem itemWithText:@"加入书签" image:[UIImage imageNamed:@"album"] action:^{
-              [self_ addBookmark];
-          }],
-          [SettingsMenuItem itemWithText:@"书签" image:[UIImage imageNamed:@"album"] action:^{
-              [self_ pushTableViewControllerWithControllerName:[BookmarkTableViewController class] style:UITableViewStylePlain];
-          }],
-          [SettingsMenuItem itemWithText:@"历史" image:[UIImage imageNamed:@"album"] action:^{
-              [self_ pushTableViewControllerWithControllerName:[HistoryTableViewController class] style:UITableViewStylePlain];
-          }],
-          [SettingsMenuItem itemWithText:@"设置" image:[UIImage imageNamed:@"album"] action:^{
-              [self_ pushTableViewControllerWithControllerName:[SettingsTableViewController class] style:UITableViewStylePlain];
-          }],
-          [SettingsMenuItem itemWithText:@"拷贝连接" image:[UIImage imageNamed:@"album"] action:^{
-              [self_ handleCopyURLButtonClicked];
-          }]
-          ];
+            [SettingsMenuItem itemWithText:@"扩展" image:[UIImage imageNamed:@"album"] action:^{
+                [self_ pushTableViewControllerWithControllerName:[ExtentionsTableViewController class] style:UITableViewStyleGrouped];
+            }],
+            [SettingsMenuItem itemWithText:@"提取" image:[UIImage imageNamed:@"album"] action:^{
+                [self_ getVideoUrl:0];
+            }],
+            [SettingsMenuItem itemWithText:@"提取1" image:[UIImage imageNamed:@"album"] action:^{
+                [self_ getVideoUrl:1];
+            }],
+            [SettingsMenuItem itemWithText:@"提取2" image:[UIImage imageNamed:@"album"] action:^{
+                [self_ getVideoUrl:2];
+            }],
+            [SettingsMenuItem itemWithText:@"加入书签" image:[UIImage imageNamed:@"album"] action:^{
+                [self_ addBookmark];
+            }],
+            [SettingsMenuItem itemWithText:@"书签" image:[UIImage imageNamed:@"album"] action:^{
+                [self_ pushTableViewControllerWithControllerName:[BookmarkTableViewController class] style:UITableViewStylePlain];
+            }],
+            [SettingsMenuItem itemWithText:@"历史" image:[UIImage imageNamed:@"album"] action:^{
+                [self_ pushTableViewControllerWithControllerName:[HistoryTableViewController class] style:UITableViewStylePlain];
+            }],
+            [SettingsMenuItem itemWithText:@"设置" image:[UIImage imageNamed:@"album"] action:^{
+                [self_ pushTableViewControllerWithControllerName:[SettingsTableViewController class] style:UITableViewStylePlain];
+            }],
+            [SettingsMenuItem itemWithText:@"拷贝连接" image:[UIImage imageNamed:@"album"] action:^{
+                [self_ handleCopyURLButtonClicked];
+            }]
+        ];
         
         [SettingsViewController presentFromViewController:self withItems:items completion:nil];
     }
@@ -274,23 +284,48 @@ SYNTHESIZE_SINGLETON_FOR_CLASS(BrowserViewController)
         pasteBoard.URL = url;
         success = YES;
     }
-
+    
     [self.view showHUDWithMessage:success ? @"拷贝成功" : @"拷贝失败"];
+}
+
+- (void)getVideoUrl:(int)index{
+    BrowserWebView *webView = self.browserContainerView.webView;
+    NSString *title = webView.mainFTitle;
+    //NSString *JsStr = @"document.body.innerHTML";
+    NSString *JsStr = @"document.getElementsByTagName(\"video\")[0].src";
+    if (index == 1){
+        JsStr = @"document.getElementsByTagName(\"video\")[1].src";
+    }else if (index == 2) {
+        JsStr = @"document.getElementsByTagName(\"video\")[2].src";
+    }
+    [webView evaluateJavaScript:JsStr completionHandler:^(id _Nullable response, NSError * _Nullable error) {
+        if(![response isEqual:[NSNull null]] && response != nil){
+            //截获到视频地址了
+            DDLogDebug(@"提取内容 == %@",response);
+            [self handleAddBookmark:title url:response];
+        }else{
+            //没有视频链接
+            DDLogDebug(@"没有提取到");
+            [self.view showHUDWithMessage:kBrowserViewControllerGetVideoUrlFailure];
+        }
+    }];
 }
 
 - (void)addBookmark{
     BrowserWebView *webView = self.browserContainerView.webView;
     NSString *title = webView.mainFTitle;
     NSString *url = webView.mainFURL;
-    
-    if (title.length == 0 || url.length == 0) {
+    [self handleAddBookmark:title url:url];
+}
+
+- (void)handleAddBookmark:(NSString *)title url:(NSString *)url {
+    if (url.length == 0) {
         [self.view showHUDWithMessage:kBrowserViewControllerAddBookmarkFailure];
         return;
     }
-    
     BookmarkDataManager *dataManager = [[BookmarkDataManager alloc] init];
     
-    BookmarkItemEditViewController *editVC = [[BookmarkItemEditViewController alloc] initWithDataManager:dataManager item:[BookmarkItemModel bookmarkItemWithTitle:title url:url] sectionIndex:[NSIndexPath indexPathForRow:0 inSection:0] operationKind:BookmarkItemOperationKindItemAdd completion:nil];
+    BookmarkItemEditViewController *editVC = [[BookmarkItemEditViewController alloc] initWithDataManager:dataManager item:[BookmarkItemModel bookmarkItemWithTitle:title ?: @"新书签" url:url] sectionIndex:[NSIndexPath indexPathForRow:0 inSection:0] operationKind:BookmarkItemOperationKindItemAdd completion:nil];
     
     UINavigationController *navigationVC = [[UINavigationController alloc] initWithRootViewController:editVC];
     

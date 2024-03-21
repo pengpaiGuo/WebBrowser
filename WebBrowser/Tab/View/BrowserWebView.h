@@ -7,6 +7,9 @@
 //
 
 #import <UIKit/UIKit.h>
+#import <WebKit/WKWebView.h>
+#import <WebKit/WKNavigationAction.h>
+#import <WebKit/WKNavigationDelegate.h>
 
 @class BrowserWebView, WebModel, WebViewBackForwardList, HomePageView;
 
@@ -19,11 +22,10 @@ typedef void(^BackForwardListCompletion)(WebViewBackForwardList *);
 
 #pragma mark - UIWebViewDelegate
 
-- (BOOL)webView:(BrowserWebView *)webView shouldStartLoadWithRequest:(NSURLRequest *)request navigationType:(UIWebViewNavigationType)navigationType;
-
+- (BOOL)browserWebView:(BrowserWebView *)webView shouldStartLoadWithRequest:(NSURLRequest *)request navigationType:(UIWebViewNavigationType)navigationType;
 @end
 
-@interface BrowserWebView : UIWebView<UIWebViewDelegate>
+@interface BrowserWebView : WKWebView<WKNavigationDelegate>
 
 @property (nonatomic, assign) WebModel *webModel;
 @property (nonatomic, assign, readonly) BOOL isMainFrameLoaded;
@@ -31,7 +33,9 @@ typedef void(^BackForwardListCompletion)(WebViewBackForwardList *);
 @property (nonatomic, assign, readonly) UILongPressGestureRecognizer *longPressGestureRecognizer;
 @property (nonatomic, retain) HomePageView *homePage;
 
-- (void)evaluateJavaScript:(NSString *)javaScriptString completionHandler:(WebCompletionBlock)completionHandler;
++ (instancetype)webView;
+
+- (void)browserEvaluateJavaScript:(NSString *)javaScriptString completionHandler:(WebCompletionBlock)completionHandler;
 
 - (NSString *)mainFURL;
 - (NSString *)mainFTitle;

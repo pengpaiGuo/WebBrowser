@@ -6,6 +6,7 @@
 //
 
 #import "NJKWebViewProgress.h"
+#import "BrowserWebView.h"
 
 NSString *completeRPCURLPath = @"/njkwebviewprogressproxy/complete";
 
@@ -75,28 +76,28 @@ const float NJKFinalProgressValue = 0.9f;
     [self setProgress:0.0];
 }
 
-- (BOOL)isFragmentJumpWithWebView:(UIWebView *)webView request:(NSURLRequest *)request{
+- (BOOL)isFragmentJumpWithWKWebView:(WKWebView *)webView request:(NSURLRequest *)request{
     BOOL isFragmentJump = NO;
     if (request.URL.fragment) {
         NSString *nonFragmentURL = [request.URL.absoluteString stringByReplacingOccurrencesOfString:[@"#" stringByAppendingString:request.URL.fragment] withString:@""];
-        if (webView.request.URL.fragment) {
-            NSString *nonFragmentMainURL = [webView.request.URL.absoluteString stringByReplacingOccurrencesOfString:[@"#" stringByAppendingString:webView.request.URL.fragment] withString:@""];
-            if ([nonFragmentURL isEqualToString:nonFragmentMainURL] && ![webView.request.URL.fragment isEqualToString:request.URL.fragment]) {
+        if (webView.URL.fragment) {
+            NSString *nonFragmentMainURL = [webView.URL.absoluteString stringByReplacingOccurrencesOfString:[@"#" stringByAppendingString:webView.URL.fragment] withString:@""];
+            if ([nonFragmentURL isEqualToString:nonFragmentMainURL] && ![webView.URL.fragment isEqualToString:request.URL.fragment]) {
                 isFragmentJump = YES;
             }
         }
         else
         {
-            isFragmentJump = [nonFragmentURL isEqualToString:webView.request.URL.absoluteString];
+            isFragmentJump = [nonFragmentURL isEqualToString:webView.URL.absoluteString];
         }
     }
     return isFragmentJump;
 }
 
 #pragma mark -
-#pragma mark UIWebViewDelegate
+#pragma mark BrowserWebViewDelegate
 
-- (BOOL)webView:(UIWebView *)webView shouldStartLoadWithRequest:(NSURLRequest *)request navigationType:(UIWebViewNavigationType)navigationType
+- (BOOL)browserWebView:(BrowserWebView *)webView shouldStartLoadWithRequest:(NSURLRequest *)request navigationType:(UIWebViewNavigationType)navigationType
 {
     if ([request.URL.path isEqualToString:completeRPCURLPath]) {
         [self completeProgress];
@@ -104,11 +105,11 @@ const float NJKFinalProgressValue = 0.9f;
     }
     
     BOOL ret = YES;
-    if ([_webViewProxyDelegate respondsToSelector:@selector(webView:shouldStartLoadWithRequest:navigationType:)]) {
-        ret = [_webViewProxyDelegate webView:webView shouldStartLoadWithRequest:request navigationType:navigationType];
+    if ([_webViewProxyDelegate respondsToSelector:@selector(browserWebView:shouldStartLoadWithRequest:navigationType:)]) {
+        ret = [_webViewProxyDelegate browserWebView:webView shouldStartLoadWithRequest:request navigationType:navigationType];
     }
     
-    BOOL isFragmentJump = [self isFragmentJumpWithWebView:webView request:request];
+    BOOL isFragmentJump = [self isFragmentJumpWithWKWebView:webView request:request];
 
     BOOL isTopLevelNavigation = [request.mainDocumentURL isEqual:request.URL];
 
@@ -120,10 +121,10 @@ const float NJKFinalProgressValue = 0.9f;
     return ret;
 }
 
-- (void)webViewDidStartLoad:(UIWebView *)webView
+- (void)browserWebViewDidStartLoad:(BrowserWebView *)webView
 {
-    if ([_webViewProxyDelegate respondsToSelector:@selector(webViewDidStartLoad:)]) {
-        [_webViewProxyDelegate webViewDidStartLoad:webView];
+    if ([_webViewProxyDelegate respondsToSelector:@selector(browserWebViewDidStartLoad:)]) {
+        [_webViewProxyDelegate browserWebViewDidStartLoad:webView];
     }
 
     _loadingCount++;
@@ -132,31 +133,57 @@ const float NJKFinalProgressValue = 0.9f;
     [self startProgress];
 }
 
-- (void)webViewDidFinishLoad:(UIWebView *)webView
+- (void)browserWebViewDidFinishLoad:(BrowserWebView *)webView
 {
-    if ([_webViewProxyDelegate respondsToSelector:@selector(webViewDidFinishLoad:)]) {
-        [_webViewProxyDelegate webViewDidFinishLoad:webView];
+    if ([_webViewProxyDelegate respondsToSelector:@selector(browserWebViewDidFinishLoad:)]) {
+        [_webViewProxyDelegate browserWebViewDidFinishLoad:webView];
+    }
+    _loadingCount--;
+    [self incrementProgress];
+    WEAK_REF(self)
+    [webView evaluateJavaScript:@"document.readyState" completionHandler:^(NSString * readyState, NSError * error) {
+        STRONG_REF(self_)
+        if (self__){
+            [self__ webViewDidFinishLoad:webView readyState:readyState];
+        }
+    }];
+}
+
+- (void)browserWebView:(BrowserWebView *)webView didFailLoadWithError:(NSError *)error
+{
+    if ([_webViewProxyDelegate respondsToSelector:@selector(browserWebView:didFailLoadWithError:)]) {
+        [_webViewProxyDelegate browserWebView:webView didFailLoadWithError:error];
     }
     
     _loadingCount--;
     [self incrementProgress];
-    
-    NSString *readyState = [webView stringByEvaluatingJavaScriptFromString:@"document.readyState"];
+    WEAK_REF(self)
+    [webView evaluateJavaScript:@"document.readyState" completionHandler:^(NSString * readyState, NSError * error) {
+        STRONG_REF(self_)
+        if (self__){
+            [self__ webView:webView didFailLoadWithError:error readyState:readyState];
+        }
+    }];
+}
 
+- (void)webViewDidFinishLoad:(WKWebView *)webView readyState:(NSString *)readyState{
+    
     BOOL interactive = [readyState isEqualToString:@"interactive"];
     if (interactive) {
         _interactive = YES;
-        NSString *waitForCompleteJS = [NSString stringWithFormat:@"window.addEventListener('load',function() { var iframe = document.createElement('iframe'); iframe.style.display = 'none'; iframe.src = '%@://%@%@'; document.body.appendChild(iframe);  }, false);", webView.request.mainDocumentURL.scheme, webView.request.mainDocumentURL.host, completeRPCURLPath];
-        [webView stringByEvaluatingJavaScriptFromString:waitForCompleteJS];
+        NSString *waitForCompleteJS = [NSString stringWithFormat:@"window.addEventListener('load',function() { var iframe = document.createElement('iframe'); iframe.style.display = 'none'; iframe.src = '%@://%@%@'; document.body.appendChild(iframe);  }, false);", webView.URL.scheme, webView.URL.host, completeRPCURLPath];
+        [webView evaluateJavaScript:waitForCompleteJS completionHandler:^(NSString * readyState, NSError * error) {
+            
+        }];
     }
     
     BOOL isNotRedirect = YES;
     //remove fragment
     if (_currentURL && _currentURL.fragment) {
         NSString *nonFragmentURL = [_currentURL.absoluteString stringByReplacingOccurrencesOfString:[@"#" stringByAppendingString:_currentURL.fragment] withString:@""];
-        NSString *nonFragmentMainURL = webView.request.URL.absoluteString;
-        if (webView.request.URL.fragment){
-            nonFragmentMainURL = [webView.request.URL.absoluteString stringByReplacingOccurrencesOfString:[@"#" stringByAppendingString:webView.request.URL.fragment] withString:@""];
+        NSString *nonFragmentMainURL = webView.URL.absoluteString;
+        if (webView.URL.fragment){
+            nonFragmentMainURL = [webView.URL.absoluteString stringByReplacingOccurrencesOfString:[@"#" stringByAppendingString:webView.URL.fragment] withString:@""];
         }
         isNotRedirect = [nonFragmentMainURL isEqualToString:nonFragmentURL];
     }
@@ -166,32 +193,24 @@ const float NJKFinalProgressValue = 0.9f;
     }
 }
 
-- (void)webView:(UIWebView *)webView didFailLoadWithError:(NSError *)error
-{
-    if ([_webViewProxyDelegate respondsToSelector:@selector(webView:didFailLoadWithError:)]) {
-        [_webViewProxyDelegate webView:webView didFailLoadWithError:error];
-    }
-    
-    _loadingCount--;
-    [self incrementProgress];
-
-    NSString *readyState = [webView stringByEvaluatingJavaScriptFromString:@"document.readyState"];
-
+- (void)webView:(WKWebView *)webView didFailLoadWithError:(NSError *)error readyState:(NSString *)readyState{
     BOOL interactive = [readyState isEqualToString:@"interactive"];
     if (interactive) {
         _interactive = YES;
-        NSString *waitForCompleteJS = [NSString stringWithFormat:@"window.addEventListener('load',function() { var iframe = document.createElement('iframe'); iframe.style.display = 'none'; iframe.src = '%@://%@%@'; document.body.appendChild(iframe);  }, false);", webView.request.mainDocumentURL.scheme, webView.request.mainDocumentURL.host, completeRPCURLPath];
-        [webView stringByEvaluatingJavaScriptFromString:waitForCompleteJS];
+        NSString *waitForCompleteJS = [NSString stringWithFormat:@"window.addEventListener('load',function() { var iframe = document.createElement('iframe'); iframe.style.display = 'none'; iframe.src = '%@://%@%@'; document.body.appendChild(iframe);  }, false);", webView.URL.scheme, webView.URL.host, completeRPCURLPath];
+        [webView evaluateJavaScript:waitForCompleteJS completionHandler:^(NSString * readyState, NSError * error) {
+            
+        }];
     }
     
-    BOOL isNotRedirect = _currentURL && [_currentURL isEqual:webView.request.mainDocumentURL];
+    BOOL isNotRedirect = _currentURL && [_currentURL isEqual:webView.URL];
     BOOL complete = [readyState isEqualToString:@"complete"];
     if ((complete && isNotRedirect) || error) {
         [self completeProgress];
     }
 }
 
-#pragma mark - 
+#pragma mark -
 #pragma mark Method Forwarding
 // for future UIWebViewDelegate impl
 

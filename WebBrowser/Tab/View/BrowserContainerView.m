@@ -150,7 +150,7 @@ static NSString *const kBaiduSearchPath = @"https://m.baidu.com/s?ie=utf-8&word=
             
             self__.webView = browserWebView;
             
-            if (!browserWebView.request) {
+            if (!browserWebView.URL) {
                 SessionData *sessionData = webModel.sessionData;
                 if (sessionData) {
                     NSDictionary *originalDic = sessionData.jsonDictionary;
@@ -187,7 +187,7 @@ static NSString *const kBaiduSearchPath = @"https://m.baidu.com/s?ie=utf-8&word=
     [webView addSubview:homePage];
     
     // remove wrong title when back to home page
-    [[DelegateManager sharedInstance] performSelector:@selector(webView:gotTitleName:) arguments:@[webView,@"首页"] key:kDelegateManagerWebView];
+    [[DelegateManager sharedInstance] performSelector:@selector(browserWebView:gotTitleName:) arguments:@[webView,@"首页"] key:kDelegateManagerWebView];
 }
 
 #pragma mark - ActivityView
@@ -363,7 +363,7 @@ static NSString *const kBaiduSearchPath = @"https://m.baidu.com/s?ie=utf-8&word=
                     }
                 }];
             } else {
-                UIAlertController *accessDenied = [UIAlertController alertControllerWithTitle:@"WebBrowser 想要访问照片" message:@"将允许图片保存到照片" preferredStyle:UIAlertControllerStyleAlert];
+                UIAlertController *accessDenied = [UIAlertController alertControllerWithTitle:@"想要访问照片" message:@"将允许图片保存到照片" preferredStyle:UIAlertControllerStyleAlert];
                 
                 UIAlertAction *dismissAction = [UIAlertAction actionDismiss];
                 [accessDenied addAction:dismissAction];
@@ -414,21 +414,21 @@ static NSString *const kBaiduSearchPath = @"https://m.baidu.com/s?ie=utf-8&word=
     switch (tag) {
         case BottomToolBarForwardButtonTag:
         {
-            [self removeHomePageIfNeededWithWebView:self.webView url:self.webView.request.URL needsEqual:YES];
+            [self removeHomePageIfNeededWithWebView:self.webView url:self.webView.URL needsEqual:YES];
             [self.webView goForward];
             break;
         }
         case BottomToolBarBackButtonTag:
         {
-            [self removeHomePageIfNeededWithWebView:self.webView url:self.webView.request.URL needsEqual:YES];
+            [self removeHomePageIfNeededWithWebView:self.webView url:self.webView.URL needsEqual:YES];
             [self.webView goBack];
             break;
         }
         case BottomToolBarRefreshButtonTag:
         {
-            NSURL *url = self.webView.request.URL;
+            NSURL *url = self.webView.URL;
             if ([url isErrorPageURL]) {
-                NSURL *url = [self.webView.request.URL originalURLFromErrorURL];
+                NSURL *url = [self.webView.URL originalURLFromErrorURL];
                 [self startLoadWithWebView:self.webView url:url];
             }
             else if (!url || [url.absoluteString isEqualToString:@""]){
@@ -451,9 +451,10 @@ static NSString *const kBaiduSearchPath = @"https://m.baidu.com/s?ie=utf-8&word=
 
 #pragma mark - WebViewDelegate
 
-- (BOOL)webView:(BrowserWebView *)webView shouldStartLoadWithRequest:(NSURLRequest *)request navigationType:(UIWebViewNavigationType)navigationType{
+- (BOOL)browserWebView:(BrowserWebView *)webView shouldStartLoadWithRequest:(NSURLRequest *)request navigationType:(UIWebViewNavigationType)navigationType {
     if (webView == self.webView) {
         NSURLComponents *url = [NSURLComponents componentsWithString:request.URL.absoluteString];
+        NSString * scheme = url.scheme;        
         if ([url.scheme isEqualToString:@"zwerror"] && [url.host isEqualToString:@"reload"]) {
             [self browserBottomToolBarButtonClickedWithTag:BottomToolBarRefreshButtonTag];
             return NO;
@@ -546,7 +547,7 @@ static NSString *const kBaiduSearchPath = @"https://m.baidu.com/s?ie=utf-8&word=
     
     escaped = (escaped) ? escaped : @"";
     
-    [self.webView evaluateJavaScript:[NSString stringWithFormat:@"window.__zhongwu__.%@(\"%@\")",function,escaped] completionHandler:nil];
+    [self.webView browserEvaluateJavaScript:[NSString stringWithFormat:@"window.__zhongwu__.%@(\"%@\")",function,escaped] completionHandler:nil];
 }
 
 #pragma mark - MenuHelperInterface Protocol
@@ -574,7 +575,7 @@ static NSString *const kBaiduSearchPath = @"https://m.baidu.com/s?ie=utf-8&word=
 
 - (void)getWebViewSelectionWithCompletion:(void(^)(NSString *result))completion{
     WEAK_REF(self)
-    [self.webView evaluateJavaScript:@"window.__zhongwu__.getSelection()" completionHandler:^(NSString *result, NSError *error){
+    [self.webView browserEvaluateJavaScript:@"window.__zhongwu__.getSelection()" completionHandler:^(NSString *result, NSError *error){
         STRONG_REF(self_)
         if (self__ && result.length > 0 && completion) {
             dispatch_main_safe_async(^{
@@ -599,7 +600,7 @@ static NSString *const kBaiduSearchPath = @"https://m.baidu.com/s?ie=utf-8&word=
 }
 
 - (void)findInPageDidPressClose:(FindInPageBar *)findInPage{
-    [self.webView evaluateJavaScript:@"window.__zhongwu__.findDone()" completionHandler:nil];
+    [self.webView browserEvaluateJavaScript:@"window.__zhongwu__.findDone()" completionHandler:nil];
 }
 
 #pragma mark - Dealloc

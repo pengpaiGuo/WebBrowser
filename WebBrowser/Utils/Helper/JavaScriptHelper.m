@@ -48,7 +48,7 @@ SYNTHESIZE_SINGLETON_FOR_CLASS(JavaScriptHelper)
 + (void)loadJavascriptWithName:(NSString *)name webView:(BrowserWebView *)webView{
     NSString *source = [self getJSSourceWithName:name];
     if (source) {
-        [webView evaluateJavaScript:source completionHandler:nil];
+        [webView browserEvaluateJavaScript:source completionHandler:nil];
     }
 }
 
@@ -57,7 +57,7 @@ SYNTHESIZE_SINGLETON_FOR_CLASS(JavaScriptHelper)
         [self loadJavascriptWithName:@"NoImageModeHelper" webView:webView];
     }
     
-    [webView evaluateJavaScript:[NSString stringWithFormat:@"window.__zhongwu__.NoImageMode.setEnabled(%d)",enabled] completionHandler:nil];
+    [webView browserEvaluateJavaScript:[NSString stringWithFormat:@"window.__zhongwu__.NoImageMode.setEnabled(%d)",enabled] completionHandler:nil];
 }
     
 + (void)setLongPressGestureWithWebView:(BrowserWebView *)webView{
@@ -75,9 +75,8 @@ SYNTHESIZE_SINGLETON_FOR_CLASS(JavaScriptHelper)
 + (void)setEyeProtectiveWithWebView:(BrowserWebView *)webView colorValue:(NSInteger)colorValue loadPrimaryScript:(BOOL)needsLoad{
     if (needsLoad) {
         [self loadJavascriptWithName:@"EyeProtective" webView:webView];
+        [webView browserEvaluateJavaScript:[NSString stringWithFormat:@"window.__zhongwu__.EyeProtective.setColorValue(%ld)",(long)colorValue] completionHandler:nil];
     }
-    
-    [webView evaluateJavaScript:[NSString stringWithFormat:@"window.__zhongwu__.EyeProtective.setColorValue(%ld)",(long)colorValue] completionHandler:nil];
 }
 
 @end

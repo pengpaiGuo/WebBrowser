@@ -291,7 +291,7 @@ SYNTHESIZE_SINGLETON_FOR_CLASS(TabManager)
         WebModel *curModel = [self_.webModelArray lastObject];
         if (!curModel.webView) {
             dispatch_main_safe_async(^{
-                browserWebView = [BrowserWebView new];
+                browserWebView = [BrowserWebView webView];
                 browserWebView.scrollView.contentInset = UIEdgeInsetsMake(TOP_TOOL_BAR_HEIGHT, 0, BOTTOM_TOOL_BAR_HEIGHT, 0);
                 browserWebView.scrollView.delegate = BrowserVC;
                 
@@ -577,12 +577,12 @@ SYNTHESIZE_SINGLETON_FOR_CLASS(TabManager)
 #pragma mark - BrowserWebViewDelegate Method
 
 //当解析完head标签后注入无图模式js,需要注意的是，当启用无图模式时，UIWebView依然会进行图片网络请求,只是设置visible为false
-- (void)webView:(BrowserWebView *)webView gotTitleName:(NSString*)titleName{
+- (void)browserWebView:(BrowserWebView *)webView gotTitleName:(NSString*)titleName{
     [ExtentionsManager loadExtentionsIfNeededWhenGotTitleWithWebView:webView];
     [[HistorySQLiteManager sharedInstance] insertOrUpdateHistoryWithURL:webView.mainFURL title:titleName];
 }
 
-- (void)webView:(BrowserWebView *)webView didFailLoadWithError:(NSError *)error{
+- (void)browserWebView:(BrowserWebView *)webView didFailLoadWithError:(NSError *)error{
     if (error.code == kCFURLErrorCancelled) {
         return;
     }
@@ -600,16 +600,16 @@ SYNTHESIZE_SINGLETON_FOR_CLASS(TabManager)
     }
 }
 
-- (void)webViewForMainFrameDidFinishLoad:(BrowserWebView *)webView{
+- (void)browserWebViewForMainFrameDidFinishLoad:(BrowserWebView *)webView{
     [self saveWebModelData];
 }
 
-- (void)webViewDidFinishLoad:(BrowserWebView *)webView{
+- (void)browserWebViewDidFinishLoad:(BrowserWebView *)webView{
     [ExtentionsManager loadExtentionsIfNeededWhenWebViewDidFinishLoad:webView];
 }
 
 // Add basic authentication
-- (void)webView:(BrowserWebView *)webView didReceiveAuthenticationChallenge:(NSURLAuthenticationChallenge *)challenge {
+- (void)browserWebView:(BrowserWebView *)webView didReceiveAuthenticationChallenge:(NSURLAuthenticationChallenge *)challenge {
     if (challenge.previousFailureCount == 0 && ([challenge.protectionSpace.authenticationMethod isEqualToString:NSURLAuthenticationMethodHTTPBasic] || [challenge.protectionSpace.authenticationMethod isEqualToString:NSURLAuthenticationMethodHTTPDigest] || [challenge.protectionSpace.authenticationMethod isEqualToString:NSURLAuthenticationMethodNTLM])) {
         NSURLCredential *credential = challenge.proposedCredential;
         if (credential && credential.user.length > 0) {
@@ -655,13 +655,13 @@ SYNTHESIZE_SINGLETON_FOR_CLASS(TabManager)
 #pragma mark - SSL Error Handler
 
 - (void)handleSSLUntrustedWithWebView:(BrowserWebView *)webView{
-    UIAlertController *accessDenied = [UIAlertController alertControllerWithTitle:@"您的连接不是私密连接" message:[NSString stringWithFormat:@"攻击者可能会试图从 %@ 窃取您的信息（例如：密码、通讯内容或信用卡信息）。",webView.request.URL.host] preferredStyle:UIAlertControllerStyleActionSheet];
+    UIAlertController *accessDenied = [UIAlertController alertControllerWithTitle:@"您的连接不是私密连接" message:[NSString stringWithFormat:@"攻击者可能会试图从 %@ 窃取您的信息（例如：密码、通讯内容或信用卡信息）。",webView.URL.host] preferredStyle:UIAlertControllerStyleActionSheet];
     
     UIAlertAction *dismissAction = [UIAlertAction actionDismiss];
     [accessDenied addAction:dismissAction];
     
     UIAlertAction *continueAction = [UIAlertAction actionWithTitle:@"继续前往（不安全）" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action){
-        URLConnectionDelegateProxy *proxy __attribute__((unused)) = [[URLConnectionDelegateProxy alloc] initWithURL:webView.request.URL success:^{
+        URLConnectionDelegateProxy *proxy __attribute__((unused)) = [[URLConnectionDelegateProxy alloc] initWithURL:webView.URL success:^{
             [webView reload];
         } failure:nil];
     }];

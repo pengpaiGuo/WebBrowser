@@ -19,14 +19,14 @@ extern NSString *const kDelegateManagerFindInPageBarDelegate;
 @protocol BrowserWebViewDelegate <NSObject>
 
 @optional
-- (void)webViewDidStartLoad:(BrowserWebView *)webView;
-- (void)webViewDidFinishLoad:(BrowserWebView *)webView;
-- (void)webView:(BrowserWebView *)webView didFailLoadWithError:(NSError *)error;
-- (void)webView:(BrowserWebView *)webView gotTitleName:(NSString*)titleName;
-- (void)webViewForMainFrameDidCommitLoad:(BrowserWebView *)webView;
-- (void)webViewForMainFrameDidFinishLoad:(BrowserWebView *)webView;
-- (void)webView:(BrowserWebView *)webView didReceiveAuthenticationChallenge:(NSURLAuthenticationChallenge *)challenge;
-
+- (void)browserWebViewDidStartLoad:(BrowserWebView *)webView;
+- (void)browserWebViewDidFinishLoad:(BrowserWebView *)webView;
+- (void)browserWebView:(BrowserWebView *)webView didFailLoadWithError:(NSError *)error;
+- (void)browserWebView:(BrowserWebView *)webView gotTitleName:(NSString*)titleName;
+- (void)browserWebViewForMainFrameDidCommitLoad:(BrowserWebView *)webView;
+- (void)browserWebViewForMainFrameDidFinishLoad:(BrowserWebView *)webView;
+- (void)browserWebView:(BrowserWebView *)webView didReceiveAuthenticationChallenge:(NSURLAuthenticationChallenge *)challenge;
+- (BOOL)browserWebView:(BrowserWebView *)webView shouldStartLoadWithRequest:(NSURLRequest *)request navigationType:(UIWebViewNavigationType)navigationType;
 @end
 
 

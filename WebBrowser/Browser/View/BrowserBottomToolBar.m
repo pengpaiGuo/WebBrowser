@@ -104,32 +104,32 @@
 
 #pragma mark - BrowserWebViewDelegate
 
-- (void)webViewDidFinishLoad:(BrowserWebView *)webView{
+- (void)browserWebViewDidFinishLoad:(BrowserWebView *)webView{
     if (IsCurrentWebView(webView)) {
         [self updateForwardBackItem];
     }
 }
 
-- (void)webView:(BrowserWebView *)webView didFailLoadWithError:(NSError *)error{
+- (void)browserWebView:(BrowserWebView *)webView didFailLoadWithError:(NSError *)error{
     if (IsCurrentWebView(webView)) {
         [self updateForwardBackItem];
         [self setToolBarButtonRefreshOrStop:YES];
     }
 }
 
-- (void)webViewForMainFrameDidFinishLoad:(BrowserWebView *)webView{
+- (void)browserWebViewForMainFrameDidFinishLoad:(BrowserWebView *)webView{
     if (IsCurrentWebView(webView)) {
         [self setToolBarButtonRefreshOrStop:YES];
     }
 }
 
-- (void)webViewForMainFrameDidCommitLoad:(BrowserWebView *)webView{
+- (void)browserWebViewForMainFrameDidCommitLoad:(BrowserWebView *)webView{
     if (IsCurrentWebView(webView)) {
         [self setToolBarButtonRefreshOrStop:NO];
     }
 }
 
-- (BOOL)webView:(BrowserWebView *)webView shouldStartLoadWithRequest:(NSURLRequest *)request navigationType:(UIWebViewNavigationType)navigationType {
+- (BOOL)browserWebView:(BrowserWebView *)webView shouldStartLoadWithRequest:(NSURLRequest *)request navigationType:(UIWebViewNavigationType)navigationType {
     if (IsCurrentWebView(webView)) {
         [self updateForwardBackItem];
     }

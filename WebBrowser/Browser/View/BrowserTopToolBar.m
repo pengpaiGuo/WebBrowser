@@ -104,35 +104,35 @@
 
 #pragma mark - BrowserWebViewDelegate
 
-- (void)webView:(BrowserWebView *)webView gotTitleName:(NSString *)titleName{
+- (void)browserWebView:(BrowserWebView *)webView gotTitleName:(NSString *)titleName{
     if (IsCurrentWebView(webView)) {
         [self setTopURLOrTitle:titleName];
     }
 }
 
-- (BOOL)webView:(BrowserWebView *)webView shouldStartLoadWithRequest:(NSURLRequest *)request navigationType:(UIWebViewNavigationType)navigationType {
-    if (IsCurrentWebView(webView) && [self.progressProxy respondsToSelector:@selector(webView:shouldStartLoadWithRequest:navigationType:)]) {
-        return [self.progressProxy webView:webView shouldStartLoadWithRequest:request navigationType:navigationType];
+- (BOOL)browserWebView:(BrowserWebView *)webView shouldStartLoadWithRequest:(NSURLRequest *)request navigationType:(UIWebViewNavigationType)navigationType {
+    if (IsCurrentWebView(webView) && [self.progressProxy respondsToSelector:@selector(browserWebView:shouldStartLoadWithRequest:navigationType:)]) {
+        return [self.progressProxy browserWebView:webView shouldStartLoadWithRequest:request navigationType:navigationType];
     }
 
     return YES;
 }
 
-- (void)webViewDidFinishLoad:(BrowserWebView *)webView{
-    if (IsCurrentWebView(webView) && [self.progressProxy respondsToSelector:@selector(webViewDidFinishLoad:)]) {
-        [self.progressProxy webViewDidFinishLoad:webView];
+- (void)browserWebViewDidFinishLoad:(BrowserWebView *)webView{
+    if (IsCurrentWebView(webView) && [self.progressProxy respondsToSelector:@selector(browserWebViewDidFinishLoad:)]) {
+        [self.progressProxy browserWebViewDidFinishLoad:webView];
     }
 }
 
-- (void)webViewDidStartLoad:(BrowserWebView *)webView{
-    if (IsCurrentWebView(webView) && [self.progressProxy respondsToSelector:@selector(webViewDidStartLoad:)]) {
-        [self.progressProxy webViewDidFinishLoad:webView];
+- (void)browserWebViewDidStartLoad:(BrowserWebView *)webView{
+    if (IsCurrentWebView(webView) && [self.progressProxy respondsToSelector:@selector(browserWebViewDidStartLoad:)]) {
+        [self.progressProxy browserWebViewDidStartLoad:webView];
     }
 }
 
-- (void)webView:(BrowserWebView *)webView didFailLoadWithError:(NSError *)error{
-    if (IsCurrentWebView(webView) && [self.progressProxy respondsToSelector:@selector(webView:didFailLoadWithError:)]) {
-        [self.progressProxy webView:webView didFailLoadWithError:error];
+- (void)browserWebView:(BrowserWebView *)webView didFailLoadWithError:(NSError *)error{
+    if (IsCurrentWebView(webView) && [self.progressProxy respondsToSelector:@selector(browserWebView:didFailLoadWithError:)]) {
+        [self.progressProxy browserWebView:webView didFailLoadWithError:error];
     }
 }
 
